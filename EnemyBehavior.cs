@@ -1,12 +1,15 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 public class EnemyBehavior : MonoBehaviour
 {
+
+    private Animator animator;
     bool[,] map;
+    bool playing = true;
     int mapSize;
-    int yPosition = 1;  // nu avem podea? :))
+    int yPosition = 0;  // nu avem podea? :))
     int mapDifference;  // pozitia map[1,1] === transform.position (1- mapDifference, yPosition, 1-mapDifference) 
 
     List<KeyValuePair<int, int>> navPositions = new List<KeyValuePair<int, int>>(); // pozitiile navigabile
@@ -15,9 +18,11 @@ public class EnemyBehavior : MonoBehaviour
     PathFinding pathFinder;
     List<PathNode> path;
     public float speed = 0.1f;
+    
 
     int startX = -1, startZ, endX, endZ;
     private bool chasing=false;
+    private float rotationSpeed=2f;
 
     void OnEnable()
     {
@@ -27,6 +32,7 @@ public class EnemyBehavior : MonoBehaviour
         getNavPositions();
         pathFinder=new PathFinding(map);
         SetTarget();
+        animator = GetComponent<Animator>();
 
     }
 
@@ -99,38 +105,63 @@ public class EnemyBehavior : MonoBehaviour
 
     private void FindTarget()
     {
-        float targetRange = 5f;
+        float targetRange = 5f;  //distanta minima la care incepe urmarirea
 
         int newX= (int)GameObject.Find("Cube").transform.position.x;
         int newZ = (int)GameObject.Find("Cube").transform.position.z;
-        if (Vector3.Distance(transform.position, new Vector3(newX, 1, newZ)) < targetRange) //pozitia playerului
+        if (Vector3.Distance(transform.position, new Vector3(newX, 1, newZ)) <= 1.5f) //te-o prins
+        { 
+            gameOver();
+            return;
+        }
+
+            if (Vector3.Distance(transform.position, new Vector3(newX, 1, newZ)) < targetRange) //pozitia playerului
         {
             //chase that mf
             if (!chasing || currentPathIndex >= pathVectorList.Count)
             {
                 chasing = true;
+                animator.SetBool("chasing", true);
                 SetTarget(); 
             }
         }
         else if (chasing)
         {
             chasing = false;
+            animator.SetBool("chasing", false);
             endX = (int)transform.position.x+mapDifference;
             endZ = (int)transform.position.z+mapDifference;
             SetTarget();
         }
     }
 
+    void gameOver()
+    {
+        playing = false;
+        animator.SetBool("chasing", false);
+        animator.SetBool("attack", true);
+    }
+
 
     void Update()
     {
-            FindTarget();
-            if (pathVectorList != null)
+        if (playing)
+        {
+                FindTarget();
+                if (pathVectorList != null)
             {
                 Vector3 targetPosition = pathVectorList[currentPathIndex];
                 if (Vector3.Distance(transform.position, targetPosition) > 0.05f)
                 {
                     Vector3 moveDir = (targetPosition - transform.position).normalized;
+                    if (moveDir != Vector3.zero)
+                    {
+                        transform.rotation = Quaternion.Slerp(
+                            transform.rotation,
+                            Quaternion.LookRotation(moveDir),
+                            Time.deltaTime * rotationSpeed
+                        );
+                    }
                     transform.position = transform.position + moveDir * speed * Time.deltaTime;
                 }
                 else
@@ -141,6 +172,7 @@ public class EnemyBehavior : MonoBehaviour
                         SetTarget();
                 }
             }
+        }
         
     }
 }
